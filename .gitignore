@@ -1,0 +1,23 @@
+# 套件與建置產物
+node_modules/
+.next/
+dist/
+build/
+coverage/
+
+# 本機環境與秘密資料
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+service-account*.json
+
+# Firebase 與部署暫存檔
+.firebase/
+firebase-debug.log
+.vercel/
+
+# 系統檔案
+.DS_Store
+Thumbs.db
