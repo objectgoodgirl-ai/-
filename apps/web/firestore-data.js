@@ -258,7 +258,7 @@ function applyRemoteData() {
 function listenOperations() {
   onSnapshot(collection(db, "staffProfiles"), (snapshot) => {
     remoteIds.staff = new Set(snapshot.docs.map((item) => item.id));
-    remote.employees = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })); applyRemoteData();
+    remote.employees = snapshot.docs.map((item) => decodeEmployee(item.id, item.data())); applyRemoteData();
   });
   onSnapshot(collection(db, "assignments"), (snapshot) => {
     remoteIds.assignments = new Set(snapshot.docs.map((item) => item.id));
@@ -292,11 +292,28 @@ async function syncCollection(batch, path, values, known) {
   [...known].filter((id) => !ids.has(id)).forEach((id) => batch.delete(doc(db, path, id)));
 }
 
+function encodeEmployee(employee) {
+  const { patterns, ...data } = employee;
+  // Firestore 不接受陣列內再放陣列；輪班週次改為 map，讀回網站時再還原。
+  const patternMap = Object.fromEntries((patterns || []).map((week, index) => [`week${index}`, week]));
+  return { ...data, patterns: patternMap };
+}
+
+function decodeEmployee(id, data) {
+  const patternSource = data.patterns || {};
+  const patterns = Array.isArray(patternSource)
+    ? patternSource
+    : Object.entries(patternSource)
+      .sort(([first], [second]) => first.localeCompare(second, undefined, { numeric: true }))
+      .map(([, week]) => week);
+  return { id, ...data, patterns };
+}
+
 async function syncHrData(data) {
   if (!data || !manager()) return;
   try {
     const batch = writeBatch(db);
-    await syncCollection(batch, "staffProfiles", data.employees || [], remoteIds.staff);
+    await syncCollection(batch, "staffProfiles", (data.employees || []).map(encodeEmployee), remoteIds.staff);
     await syncCollection(batch, "assignments", data.assignments || [], remoteIds.assignments);
     await syncCollection(batch, "leaves", data.leaves || [], remoteIds.leaves);
     await syncCollection(batch, "tasks", data.tasks || [], remoteIds.tasks);
