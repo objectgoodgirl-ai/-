@@ -1,62 +1,45 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
-      return request.auth != null;
-    }
-
-    function isBootstrapOwner() {
-      return signedIn() && request.auth.token.email == 'objectgoodgirl@gmail.com';
-    }
-
+    function signedIn() { return request.auth != null; }
+    function isBootstrapOwner() { return signedIn() && request.auth.token.email == 'objectgoodgirl@gmail.com'; }
     function hasRole(role) {
       return signedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
     }
-
-    function isOwner() {
-      return isBootstrapOwner() || hasRole('owner');
-    }
-
-    function isManager() {
-      return isOwner() || hasRole('manager');
-    }
-
+    function isOwner() { return isBootstrapOwner() || hasRole('owner'); }
+    function isManager() { return isOwner() || hasRole('manager'); }
     function isActiveUser() {
       return signedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true;
     }
-
     function hasActiveInvitation() {
       return signedIn()
         && exists(/databases/$(database)/documents/invitations/$(request.auth.token.email))
         && get(/databases/$(database)/documents/invitations/$(request.auth.token.email)).data.status == 'active';
     }
-
-    function hasEmployeeRole(role) {
-      return role in ['supervisor', 'case_lead', 'employee'];
-    }
-
+    function hasEmployeeRole(role) { return role in ['supervisor', 'case_lead', 'employee']; }
     function validSelfProfile() {
       return request.resource.data.email == request.auth.token.email
         && request.resource.data.active == true
         && request.resource.data.role == get(/databases/$(database)/documents/invitations/$(request.auth.token.email)).data.role;
     }
+    function leadsCase(caseId) {
+      return isActiveUser()
+        && exists(/databases/$(database)/documents/cases/$(caseId))
+        && get(/databases/$(database)/documents/cases/$(caseId)).data.leadUid == request.auth.uid;
+    }
 
     match /users/{userId} {
       allow get: if signedIn() && (request.auth.uid == userId || isManager());
       allow list: if isManager();
-
-      // 初始老闆建立自己的帳號；其他使用者只能以管理者建立的邀請啟用自己帳號。
       allow create: if request.auth.uid == userId && (
         (isBootstrapOwner() && request.resource.data.role == 'owner' && request.resource.data.active == true)
         || (hasActiveInvitation() && validSelfProfile())
       );
-
-      // 使用者只能更新自己的基本顯示資料，無法自行變更角色或啟用狀態。
       allow update: if request.auth.uid == userId
         && request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['displayName', 'photoURL', 'updatedAt'])
@@ -73,7 +56,6 @@ service cloud.firestore {
     }
 
     match /invitations/{email} {
-      // 受邀人只能讀取自己的邀請；管理者可查看整份名冊。
       allow get: if signedIn() && (request.auth.token.email == email || isManager());
       allow list: if isManager();
       allow create, update: if isOwner()
@@ -84,26 +66,35 @@ service cloud.firestore {
     }
 
     match /cases/{caseId} {
-      function isMember(caseData) {
-        return request.auth.uid == caseData.leadUid || request.auth.uid in caseData.memberUids;
-      }
-
-      allow get: if isManager() || (isActiveUser() && isMember(resource.data));
-      allow list: if isManager();
+      // 全團隊可讀案件；修改僅限管理角色或案件主負責人。
+      allow get, list: if isActiveUser();
       allow create: if isManager();
-      // 主負責人可更新案件工作內容；主負責人與協作名單只能由老闆／經理調整。
       allow update: if isManager()
         || (isActiveUser()
           && resource.data.leadUid == request.auth.uid
           && request.resource.data.leadUid == resource.data.leadUid
           && request.resource.data.memberUids == resource.data.memberUids);
       allow delete: if isManager();
-
-      // 成本、最低單價與利潤必須獨立保存，只開放老闆讀寫。
-      match /private/{documentId} {
-        allow read, write: if isOwner();
-      }
+      match /private/{documentId} { allow read, write: if isOwner(); }
     }
+
+    match /quotes/{quoteId} {
+      allow get, list: if isActiveUser();
+      allow create: if isManager() || leadsCase(request.resource.data.caseId);
+      allow update: if isManager()
+        || (leadsCase(resource.data.caseId)
+          && request.resource.data.caseId == resource.data.caseId);
+      allow delete: if isManager();
+      match /private/{documentId} { allow read, write: if isOwner(); }
+    }
+
+    // 第一階段由老闆、經理集中維護人員與班表；所有啟用帳號可查閱。
+    match /staffProfiles/{staffId} { allow read: if isActiveUser(); allow write: if isManager(); }
+    match /assignments/{assignmentId} { allow read: if isActiveUser(); allow write: if isManager(); }
+    match /leaves/{leaveId} { allow read: if isActiveUser(); allow write: if isManager(); }
+    match /tasks/{taskId} { allow read: if isActiveUser(); allow write: if isManager(); }
+    match /rosterOverrides/{overrideId} { allow read: if isActiveUser(); allow write: if isManager(); }
+    match /settings/{settingId} { allow read: if isActiveUser(); allow write: if isManager(); }
 
     match /auditLogs/{logId} {
       allow read: if isManager();

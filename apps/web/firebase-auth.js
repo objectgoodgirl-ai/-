@@ -511,3 +511,7 @@ onAuthStateChanged(auth, async (user) => {
     showGate("無法確認帳號權限，請稍後重試或請管理者檢查 Firestore 設定。", "error", true);
   }
 });
+
+// 資料同步模組會匯入這三個實體；前端 Firebase 設定並不等於資料存取權限，
+// 實際存取仍受 firestore.rules 驗證。
+export { app, auth, db };
