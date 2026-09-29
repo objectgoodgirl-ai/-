@@ -30,6 +30,15 @@
 4. LINE 官方帳號與 n8n 派工通知、30 分鐘逾時提醒。
 5. 報價版本、簽約後家屬同意與 PDF 列印。
 
+## Firebase 登入現況
+
+- Firebase 專案與網頁應用程式已建立。
+- Google 登入已整合至 `apps/web/index.html`。
+- 初始系統管理員為 `objectgoodgirl@gmail.com`；其他帳號暫時顯示待核准。
+- 正式員工核准、角色與案件權限將於 Firestore 建立後由資料庫與 Security Rules 控管。
+
+詳細的部署與授權網域設定請見 [Firebase 登入設定](docs/firebase-auth-setup.md)。
+
 ## 角色
 
 | 角色 | 主要權限 |
