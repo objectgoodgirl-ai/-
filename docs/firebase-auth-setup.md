@@ -7,11 +7,17 @@
 - Firebase Authentication：Google 登入已啟用
 - 初始系統管理員：`objectgoodgirl@gmail.com`
 
-## 目前登入規則
+## 登入與權限規則
 
-原型網站已接入 Firebase Google 登入。為避免未核准帳號直接看到營運資料，現階段僅初始系統管理員可進入系統。其他 Google 帳號會顯示待核准訊息。
+Google 登入負責識別使用者；帳號是否啟用、系統角色與案件責任由 Firestore 控管。
 
-下一階段建立 Firestore 後，應以 `users/{uid}` 儲存帳號、角色、啟用狀態與核准人，並由 Firestore Security Rules 強制驗證權限。不得把前端名單當成正式權限機制。
+- 初始老闆登入一次後，系統建立 `users/{uid}` 的老闆帳號。
+- 老闆或經理建立 Gmail 邀請後，員工第一次用相同帳號登入會自動啟用。
+- 只有老闆／經理能看見「帳號與案件權限」頁面。
+- 只有案件主負責人，以及老闆／經理，能修改該案件。
+- 成本、最低單價與利潤獨立放在 Firestore 私密子文件，只開放老闆。
+
+資料結構與規則請見 [Firestore 權限管理](firestore-權限管理.md)。
 
 ## 部署前設定
 
